@@ -3,17 +3,31 @@ import cv2
 import numpy as np
 
 lines =[]
-with open('../data/driving_log.csv') as csvfile:
+with open('../data3/driving_log.csv') as csvfile:
     reader = csv.reader(csvfile)
     for line in reader:
         lines.append(line)
+    for row in reader:
+        steering_center = float(row[3])
+                # create adjusted steering measurements for the side camera images
+        correction = 0.2 # this is a parameter to tune
+        steering_left = steering_center + correction
+        steering_right = steering_center - correction
+                 # read in images from center, left and right cameras
+        directory = "..." # fill in the path to your training IMG directory
+        img_center = process_image(np.asarray(Image.open(path + row[0])))
+        img_left = process_image(np.asarray(Image.open(path + row[1])))
+        img_right = process_image(np.asarray(Image.open(path + row[2])))
+                # add images and angles to data set
+        car_images.extend(img_center, img_left, img_right)
+        steering_angles.extend(steering_center, steering_left, steering_right)      
 
 images = []
 measurements = []
 for line in lines:
     source_path = line[0]
     filename = source_path.split('/')[-1]
-    current_path = '../data/IMG/' + filename
+    current_path = '../data3/IMG/' + filename
     image = cv2.imread(current_path)
     images.append(image)
     measurement = float(line[3])
