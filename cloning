@@ -29,9 +29,12 @@ for line in lines:
     filename = source_path.split('/')[-1]
     current_path = '../data3/IMG/' + filename
     image = cv2.imread(current_path)
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
     images.append(image)
     measurement = float(line[3])
     measurements.append(measurement)
+
+
 
 augmented_images, augmented_measurements = [], []
 for image,measurement in zip(images, measurements):
