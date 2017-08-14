@@ -1,6 +1,16 @@
+#import relevant packages
 import csv
 import cv2
 import numpy as np
+from keras.models import Sequential
+from keras.layers import Flatten, Dense, Lambda, Cropping2D
+from keras.layers import Convolution2D
+from keras.layers.pooling import MaxPooling2D
+
+#load data generated from simulator (steering angle and image files)
+#data set #7 composed of 3 center driving, 1 reverse loop
+#convert image files from color to black and white
+#generate more data by flipping images
 
 lines =[]
 with open('../data3/driving_log.csv') as csvfile:
@@ -34,8 +44,6 @@ for line in lines:
     measurement = float(line[3])
     measurements.append(measurement)
 
-
-
 augmented_images, augmented_measurements = [], []
 for image,measurement in zip(images, measurements):
     augmented_images.append(image)
@@ -46,11 +54,7 @@ for image,measurement in zip(images, measurements):
 X_train = np.array(augmented_images)
 y_train = np.array(augmented_measurements)
 
-from keras.models import Sequential
-from keras.layers import Flatten, Dense, Lambda, Cropping2D
-from keras.layers import Convolution2D
-from keras.layers.pooling import MaxPooling2D
-
+#Set-up tensorflow model using NIVIDIA architecture
 model = Sequential()
 model.add(Lambda(lambda x: x/255.0 - 0.5, input_shape=(160,320,3)))
 model.add(Cropping2D(cropping=((70,25),(0,0))))
@@ -64,7 +68,6 @@ model.add(Dense(100))
 model.add(Dense(50))
 model.add(Dense(10))
 model.add(Dense(1))
-
 model.compile(loss='mse',optimizer='adam')
 model.fit(X_train, y_train, validation_split=0.2, shuffle=True, nb_epoch=2)
 
