@@ -2,54 +2,92 @@
 import csv
 import cv2
 import numpy as np
+import pandas as pd
 from keras.models import Sequential
 from keras.layers import Flatten, Dense, Lambda, Cropping2D
 from keras.layers import Convolution2D
 from keras.layers.pooling import MaxPooling2D
+from keras.preprocessing.image import load_img, img_to_array
+from keras.applications import imagenet_utils
 
 #load data generated from simulator (steering angle and image files)
 #data set #7 composed of 3 center driving, 1 reverse loop
 #convert image files from color to black and white
 #generate more data by flipping images
 
-lines =[]
-with open('../data3/driving_log.csv') as csvfile:
-    reader = csv.reader(csvfile)
-    for line in reader:
-        lines.append(line)
-    for row in reader:
-        steering_center = float(row[3])
-                # create adjusted steering measurements for the side camera images
-        correction = 0.2 # this is a parameter to tune
-        steering_left = steering_center + correction
-        steering_right = steering_center - correction
-                 # read in images from center, left and right cameras
-        directory = "..." # fill in the path to your training IMG directory
-        img_center = process_image(np.asarray(Image.open(path + row[0])))
-        img_left = process_image(np.asarray(Image.open(path + row[1])))
-        img_right = process_image(np.asarray(Image.open(path + row[2])))
-                # add images and angles to data set
-        car_images.extend(img_center, img_left, img_right)
-        steering_angles.extend(steering_center, steering_left, steering_right)      
+# Import as a dataframe
+df = pd.read_csv('driving_log.csv', header=0)
+df.columns = ["center_image", "left_image", "right_image", "steering", "throttle", "break", "speed"]
+df.drop(['throttle', 'break', 'speed'], axis = 1, inplace = True)
+
+
+## Oversample left and right turns. Downsample turns close to zero.
+straight =[]
+left_turn = []
+right_turn = []
+
+for i in range(len(df)):
+    keep_prob = random.random()
+    # Normal right turns - Double by adding small random fluctuations
+    if (df["steering"][i] >0.20 and df["steering"][i] <=0.50):
+
+        for j in range(2):
+            new_steering = df["steering"][i]*(1.0 + np.random.uniform(-1,1)/100.0)
+            right_turn.append([df["center_image"][i], df["left_image"][i], df["right_image"][i], new_steering])
+
+    # Normal left turns -  Double by adding small random fluctuations
+
+    elif (df["steering"][i] >= -0.50 and df["steering"][i] < -0.15):
+
+        for j in range(2):
+            new_steering = df["steering"][i]*(1.0 + np.random.uniform(-1,1)/100.0)
+            left_turn.append([df["center_image"][i], df["left_image"][i], df["right_image"][i], new_steering])
+
+    ## Zero angle steering - undersample by 10% worked best
+    elif (df["steering"][i] > -0.02 and df["steering"][i] < 0.02):
+        if keep_prob <=0.90:
+            straight.append([df["center_image"][i], df["left_image"][i], df["right_image"][i], df["steering"][i]])
+
+    else:
+        straight.append([df["center_image"][i], df["left_image"][i], df["right_image"][i], df["steering"][i]])
+
+# Create a new list
+new_list = []
+new_list = right_turn + left_turn + straight
+print(len(new_list), len(straight), len(left_turn), len(right_turn))
+
+# Using images from 3 camera angles
+for row in new_list:
+    steering_center = float(row[3])
+          # create adjusted steering measurements for the side camera images
+    correction = 0.2 # this is a parameter to tune
+    steering_left = steering_center + correction
+    steering_right = steering_center - correction
+         # read in images from center, left and right cameras
+    directory = "../data7/IMG/" # fill in the path to your training IMG directory
+    img_center = process_image(np.asarray(Image.open(path + row[0])))
+    img_left = process_image(np.asarray(Image.open(path + row[1])))
+    img_right = process_image(np.asarray(Image.open(path + row[2])))
+         # add images and angles to data set
+    car_images.extend(img_center, img_left, img_right)
+    steering_angles.extend(steering_center, steering_left, steering_right)      
 
 images = []
 measurements = []
-for line in lines:
-    source_path = line[0]
-    filename = source_path.split('/')[-1]
-    current_path = '../data3/IMG/' + filename
-    image = cv2.imread(current_path)
-    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-    images.append(image)
-    measurement = float(line[3])
-    measurements.append(measurement)
 
+#preprocess data
+for i in len(car_images):
+    image = car_images[i]
+    image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+    image = cv2.cvtColor(image, cv2.COLOR_RGB2HSV)
+    images.append(image)
+    
 augmented_images, augmented_measurements = [], []
-for image,measurement in zip(images, measurements):
+for image,steering_angle in zip(images, steering_angles):
     augmented_images.append(image)
-    augmented_measurements.append(measurement)
+    augmented_measurements.append(steering_angle)
     augmented_images.append(cv2.flip(image,1))
-    augmented_measurements.append(measurement*-1.0)
+    augmented_measurements.append(steering_angle*-1.0)
     
 X_train = np.array(augmented_images)
 y_train = np.array(augmented_measurements)
